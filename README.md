@@ -4,31 +4,44 @@ Treffen. Tappen. Matchen. — Expo / React Native App (TypeScript).
 
 ## Auf dem Handy starten
 
-Du brauchst **Node.js** auf dem Rechner und die App **Expo Go** auf dem Handy
-(kostenlos im App Store / Play Store).
+In beiden Fällen brauchst du **Expo Go** auf dem Handy (kostenlos im App Store /
+Play Store).
+
+### Ohne Installation: GitHub Codespaces
+
+1. Oben auf **Code** → Reiter **Codespaces** → **Create codespace on main**
+2. Warten, bis unten im Terminal `npm install` durchgelaufen ist
+3. `npm run tunnel` eingeben
+4. QR-Code scannen — **iPhone:** mit der Kamera-App, **Android:** in Expo Go über
+   „Scan QR code"
+
+Über den Tunnel muss das Handy nicht im selben Netz sein; mobiles Internet reicht.
+
+### Lokal
+
+Dafür brauchst du **Node.js** auf dem Rechner.
 
 ```bash
 npm install
-npx expo start
+npm start
 ```
 
-Ein QR-Code erscheint im Terminal. Handy und Rechner müssen im **gleichen WLAN** sein.
-
-- **iPhone:** Kamera-App auf den QR-Code halten, auf den Hinweis tippen.
-- **Android:** Expo Go öffnen, „Scan QR code".
+QR-Code scannen wie oben. Hier müssen Handy und Rechner im **gleichen WLAN** sein —
+sonst `npm run tunnel` benutzen.
 
 Ab da bleibt die Verbindung: Du speicherst eine Datei, das Handy aktualisiert sich
 in unter einer Sekunde (Fast Refresh). Neu scannen musst du nur, wenn du den
 Dev-Server neu startest.
 
-Im Browser ansehen geht auch mit `npx expo start --web` — dort fehlen aber Haptik
-und das native Animationsgefühl.
+Im Browser ansehen geht auch mit `npm run web` — dort fehlen aber Haptik und das
+native Animationsgefühl.
 
 ## Weitere Befehle
 
 ```bash
-npx tsc --noEmit   # Typen prüfen
-npx expo start -c  # mit geleertem Cache starten
+npm run typecheck   # Typen prüfen
+npm run tunnel      # Dev-Server über Tunnel (anderes Netz / Codespaces)
+npx expo start -c   # mit geleertem Cache starten
 ```
 
 ## Aufbau
