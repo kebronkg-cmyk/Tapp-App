@@ -10,6 +10,21 @@ import { Eyebrow, GhostButton, GradientText, PrimaryButton, Sub, useTheme } from
 
 type Stage = 'search' | 'collide' | 'count' | 'reveal';
 
+/** Haptics are best-effort: silently absent on web and on devices with them switched off. */
+function hit(kind: 'light' | 'heavy' | 'success') {
+  try {
+    if (kind === 'success') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } else {
+      const style =
+        kind === 'heavy' ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Light;
+      Haptics.impactAsync(style).catch(() => {});
+    }
+  } catch {
+    // no haptics engine on this platform
+  }
+}
+
 export function BumpOverlay({
   visible,
   onClose,
@@ -48,15 +63,25 @@ export function BumpOverlay({
     setStage('search');
     later(2400, () => {
       setStage('collide');
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      // Two phones meeting should land as one solid knock, not a polite tap.
+      hit('heavy');
+      later(90, () => hit('heavy'));
       later(1250, () => {
         setStage('count');
         setCount(3);
-        later(750, () => setCount(2));
-        later(1500, () => setCount(1));
+        hit('light');
+        later(750, () => {
+          setCount(2);
+          hit('light');
+        });
+        later(1500, () => {
+          setCount(1);
+          hit('light');
+        });
         later(2250, () => {
           setStage('reveal');
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          hit('heavy');
+          later(120, () => hit('success'));
           recordBump(partner.name, partner.score);
         });
       });
