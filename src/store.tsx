@@ -3,9 +3,11 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { Mode } from './theme';
 import { seed } from './data/seed';
 import { bizQuestions, humanQuestions, type Question } from './data/questions';
+import { computeScore, type Scored } from './lib/score';
 import type { Activity, BizMatch, Connection, DB, Level, ValueKey } from './data/types';
 
-const KEY = 'tapp.db.v1';
+// Bumped when the stored shape changes; old payloads are demo data, not worth migrating.
+const KEY = 'tapp.db.v2';
 
 type Ctx = {
   db: DB;
@@ -14,6 +16,9 @@ type Ctx = {
   setMode: (m: Mode) => void;
   connectorScore: number;
   recordBump: (person: string, score: number) => void;
+  /** A real meeting happened — the only thing allowed to raise consistency. */
+  recordMeeting: (target: { kind: 'connection' | 'biz'; id: string }) => number;
+  scoreFor: (target: { kind: 'connection' | 'biz'; id: string }) => Scored | null;
   answerQuestion: (target: { kind: 'connection' | 'biz'; id: string }, qIndex: number, optIndex: number) => number;
   joinActivity: (id: string) => boolean;
   createActivity: (input: { title: string; time: string; via: string }) => void;
@@ -33,8 +38,13 @@ function hydrate(raw: string | null): DB {
   if (!raw) return structuredClone(seed);
   try {
     const parsed = JSON.parse(raw) as DB;
-    // Merge over the seed so new fields survive an older stored payload.
-    return { ...structuredClone(seed), ...parsed };
+    const merged = { ...structuredClone(seed), ...parsed };
+    // A payload written by an older build can be missing whole fields; fall back
+    // rather than rendering against a half-shaped person.
+    const sound =
+      Array.isArray(merged.connections) &&
+      merged.connections.every((c) => Array.isArray(c.interests) && c.answers && typeof c.meetings === 'number');
+    return sound ? merged : structuredClone(seed);
   } catch {
     return structuredClone(seed);
   }
@@ -77,54 +87,125 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const scoreFor = useCallback<Ctx['scoreFor']>(
+    (target) => {
+      const person =
+        target.kind === 'connection'
+          ? db.connections.find((c) => c.id === target.id)
+          : db.bizMatches.find((b) => b.id === target.id);
+      if (!person) return null;
+      return computeScore({
+        kind: target.kind,
+        mine: db.answers,
+        theirs: person.answers,
+        baseAffinity: person.baseAffinity,
+        myInterests: db.profile.want,
+        theirInterests: person.interests,
+        myTeach: db.profile.teach,
+        theirTeach: person.teach,
+        meetings: person.meetings,
+      });
+    },
+    [db.answers, db.bizMatches, db.connections, db.profile.teach, db.profile.want],
+  );
+
+  const recordMeeting = useCallback<Ctx['recordMeeting']>((target) => {
+    let gained = 0;
+    setDb((d) => {
+      const bump = <T extends { id: string; meetings: number; score: number; trend: number[]; answers: Record<string, number>; interests: any[]; teach?: string; baseAffinity: number }>(
+        person: T,
+        kind: 'connection' | 'biz',
+      ): T => {
+        const meetings = person.meetings + 1;
+        const { score } = computeScore({
+          kind,
+          mine: d.answers,
+          theirs: person.answers,
+          baseAffinity: person.baseAffinity,
+          myInterests: d.profile.want,
+          theirInterests: person.interests,
+          myTeach: d.profile.teach,
+          theirTeach: person.teach,
+          meetings,
+        });
+        gained = score - person.score;
+        return { ...person, meetings, score, trend: [...person.trend, score] };
+      };
+
+      return {
+        ...d,
+        connections:
+          target.kind === 'connection'
+            ? d.connections.map((c) =>
+                c.id === target.id ? { ...bump(c, 'connection'), bond: c.bond + 1 } : c,
+              )
+            : d.connections,
+        bizMatches:
+          target.kind === 'biz'
+            ? d.bizMatches.map((b) => (b.id === target.id ? bump(b, 'biz') : b))
+            : d.bizMatches,
+      };
+    });
+    return gained;
+  }, []);
+
   const answerQuestion = useCallback<Ctx['answerQuestion']>((target, qIndex, optIndex) => {
     const list = target.kind === 'biz' ? bizQuestions : humanQuestions;
     const q = list[qIndex];
     if (!q) return 0;
-    const delta = q.opts[optIndex].d;
-
     setDb((d) => {
-      const answered = d.answered + 1;
+      const answers = { ...d.answers, [q.id]: optIndex };
+      const answered = Object.keys(answers).length;
       const mysteryOpen = d.mysteryOpen || answered >= 3;
 
-      const bumpLevels = (levels: Level[]): Level[] =>
+      // The level bars follow the actual agreement on that dimension, not a
+      // blanket bonus for having answered anything.
+      const applyLevels = (levels: Level[], theirs: Record<string, number>): Level[] =>
         levels.map((l, i) => {
-          if (i === q.level && l.v !== null) return { ...l, v: clamp(l.v + delta * 2) };
-          // Unlocking the mystery level gives it a real starting value.
-          if (l.v === null && mysteryOpen && !d.mysteryOpen) return { ...l, v: 64 };
-          return l;
+          if (l.v === null) return mysteryOpen ? { ...l, v: 64 } : l;
+          if (i !== q.level) return l;
+          const agreement = theirs[q.id] === optIndex ? 6 : -4;
+          return { ...l, v: clamp(l.v + agreement) };
         });
+
+      const rescore = <T extends { answers: Record<string, number>; interests: any[]; teach?: string; meetings: number; baseAffinity: number; levels: Level[]; trend: number[] }>(
+        person: T,
+        kind: 'connection' | 'biz',
+      ): T => {
+        const { score } = computeScore({
+          kind,
+          mine: answers,
+          theirs: person.answers,
+          baseAffinity: person.baseAffinity,
+          myInterests: d.profile.want,
+          theirInterests: person.interests,
+          myTeach: d.profile.teach,
+          theirTeach: person.teach,
+          meetings: person.meetings,
+        });
+        return {
+          ...person,
+          score,
+          trend: [...person.trend, score],
+          levels: applyLevels(person.levels, person.answers),
+        };
+      };
 
       const connections =
         target.kind === 'connection'
-          ? d.connections.map((c) =>
-              c.id === target.id
-                ? {
-                    ...c,
-                    score: clamp(c.score + delta),
-                    trend: [...c.trend, clamp(c.score + delta)],
-                    levels: bumpLevels(c.levels),
-                  }
-                : c,
-            )
+          ? d.connections.map((c) => (c.id === target.id ? rescore(c, 'connection') : c))
           : d.connections;
 
       const bizMatches =
         target.kind === 'biz'
-          ? d.bizMatches.map((b) =>
-              b.id === target.id
-                ? {
-                    ...b,
-                    score: clamp(b.score + delta),
-                    trend: [...b.trend, clamp(b.score + delta)],
-                    levels: bumpLevels(b.levels),
-                  }
-                : b,
-            )
+          ? d.bizMatches.map((b) => (b.id === target.id ? rescore(b, 'biz') : b))
           : d.bizMatches;
 
       const values = { ...d.profile.values };
-      if (q.valueKey) values[q.valueKey as ValueKey] = clamp(values[q.valueKey as ValueKey] + delta);
+      if (q.valueKey) {
+        const w = q.opts[optIndex].w;
+        values[q.valueKey as ValueKey] = clamp(values[q.valueKey as ValueKey] + w);
+      }
 
       return {
         ...d,
@@ -132,12 +213,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         bizMatches,
         answered,
         mysteryOpen,
-        answers: { ...d.answers, [q.q]: q.opts[optIndex].t },
+        answers,
         profile: { ...d.profile, values },
       };
     });
 
-    return delta;
+    return q.opts[optIndex].w;
   }, []);
 
   const joinActivity = useCallback((id: string) => {
@@ -217,6 +298,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setMode,
       connectorScore,
       recordBump,
+      recordMeeting,
+      scoreFor,
       answerQuestion,
       joinActivity,
       createActivity,
@@ -233,6 +316,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       connectorScore,
       setMode,
       recordBump,
+      recordMeeting,
+      scoreFor,
       answerQuestion,
       joinActivity,
       createActivity,

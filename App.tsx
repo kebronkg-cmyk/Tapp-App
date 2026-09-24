@@ -1,6 +1,7 @@
 import { SpaceGrotesk_400Regular, SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
 import { Unbounded_700Bold, Unbounded_900Black } from '@expo-google-fonts/unbounded';
 import { useFonts } from 'expo-font';
+import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, ScrollView, useWindowDimensions, View } from 'react-native';
@@ -11,7 +12,7 @@ import { BumpOverlay } from './src/components/BumpOverlay';
 import { EditModal, type EditKind } from './src/components/EditModal';
 import { Header } from './src/components/Header';
 import { MatchSheet, type SheetTarget } from './src/components/MatchSheet';
-import { QuestionModal } from './src/components/QuestionModal';
+import { QuestionModal, type Comparison } from './src/components/QuestionModal';
 import { ToastProvider, useToast } from './src/components/Toast';
 import { ActivityScreen } from './src/screens/ActivityScreen';
 import { CircleScreen } from './src/screens/CircleScreen';
@@ -98,7 +99,11 @@ function Shell() {
   const [qTarget, setQTarget] = useState<SheetTarget | null>(null);
   const [qIndex, setQIndex] = useState(0);
   const [qOpen, setQOpen] = useState(false);
+  const [comparison, setComparison] = useState<Comparison | null>(null);
   const [delta, setDelta] = useState(0);
+
+  const dbRef = useRef(db);
+  dbRef.current = db;
 
   const deltaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nextTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -135,25 +140,49 @@ function Shell() {
     (optIndex: number) => {
       if (!qTarget) return;
       const q = questions[qIndex];
-      const d = answerQuestion(qTarget, qIndex, optIndex);
-      const next = qIndex + 1;
+      const person =
+        qTarget.kind === 'biz'
+          ? db.bizMatches.find((b) => b.id === qTarget.id)
+          : db.connections.find((c) => c.id === qTarget.id);
+      const before = person?.score ?? 0;
 
-      setQOpen(false);
+      answerQuestion(qTarget, qIndex, optIndex);
+      const next = qIndex + 1;
       setQIndex(next);
-      setDelta(d);
-      say(`${d > 0 ? '+' : ''}${d} Score · ${q.tag}`);
+
+      // Hold on the two answers side by side before moving on — that comparison
+      // is the point of the question, not the number it moves.
+      const theirs = person?.answers[q.id];
+      if (person && theirs != null) {
+        setComparison({ question: q, mine: optIndex, theirs, them: person.name });
+        Haptics.impactAsync(
+          optIndex === theirs ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light,
+        ).catch(() => {});
+      } else {
+        setQOpen(false);
+      }
 
       if (deltaTimer.current) clearTimeout(deltaTimer.current);
-      deltaTimer.current = setTimeout(() => setDelta(0), 1800);
+      deltaTimer.current = setTimeout(() => {
+        const after =
+          qTarget.kind === 'biz'
+            ? dbRef.current.bizMatches.find((b) => b.id === qTarget.id)?.score
+            : dbRef.current.connections.find((c) => c.id === qTarget.id)?.score;
+        if (after != null) setDelta(after - before);
+        setTimeout(() => setDelta(0), 1800);
+      }, 100);
 
       if (nextTimer.current) clearTimeout(nextTimer.current);
-      if (next < questions.length) {
-        nextTimer.current = setTimeout(() => setQOpen(true), 650);
-      } else {
-        nextTimer.current = setTimeout(() => say('Fragen-Season abgeschlossen'), 800);
-      }
+      nextTimer.current = setTimeout(() => {
+        setComparison(null);
+        if (next < questions.length) setQOpen(true);
+        else {
+          setQOpen(false);
+          say('Fragen durch — euer Fazit steht');
+        }
+      }, 2600);
     },
-    [answerQuestion, qIndex, qTarget, questions, say],
+    [answerQuestion, db.bizMatches, db.connections, qIndex, qTarget, questions, say],
   );
 
   return (
@@ -206,6 +235,7 @@ function Shell() {
         question={qOpen ? (questions[qIndex] ?? null) : null}
         index={qIndex}
         total={questions.length}
+        comparison={comparison}
         onAnswer={onAnswer}
         onClose={() => setQOpen(false)}
       />

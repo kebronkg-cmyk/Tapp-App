@@ -30,6 +30,12 @@ export type Nearby = {
 /** A compatibility dimension inside a match. `v: null` means still locked. */
 export type Level = { name: string; v: number | null };
 
+/**
+ * An interest is never just a label — `depth` is what this person actually does
+ * with it, revealed once the match has earned it.
+ */
+export type Interest = { name: string; depth: string };
+
 export type Connection = {
   id: string;
   name: string;
@@ -43,6 +49,12 @@ export type Connection = {
   levels: Level[];
   lastBump: string;
   teach?: string;
+  /** questionId -> chosen option index. */
+  answers: Record<string, number>;
+  interests: Interest[];
+  /** Real meetings, which is what consistency is allowed to count. */
+  meetings: number;
+  baseAffinity: number;
 };
 
 export type Activity = {
@@ -82,6 +94,11 @@ export type BizMatch = {
   skills: string[];
   levels: Level[];
   trend: number[];
+  answers: Record<string, number>;
+  interests: Interest[];
+  teach?: string;
+  meetings: number;
+  baseAffinity: number;
 };
 
 export type FeedItem = {
@@ -112,7 +129,8 @@ export type DB = {
   ideas: Idea[];
   bizMatches: BizMatch[];
   feed: FeedItem[];
-  answers: Record<string, string>;
+  /** The user's own answers: questionId -> chosen option index. */
+  answers: Record<string, number>;
   mysteryOpen: boolean;
   answered: number;
   bumps: BumpRecord[];

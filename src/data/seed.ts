@@ -80,6 +80,13 @@ export const seed: DB = {
       ],
       lastBump: 'vor 6 Tagen · Sportplatz',
       teach: 'Freistöße & Standards',
+      answers: { h1: 0, h2: 0, h3: 0, h4: 1, h5: 0, h6: 0 },
+      interests: [
+        { name: 'Fußball', depth: 'Spielt seit er 6 ist, linker Verteidiger, dreimal die Woche Training. Sagt, er denkt beim Spielen an nichts — deshalb geht er hin.' },
+        { name: 'Bouldern', depth: 'Erst seit diesem Jahr, über einen Kollegen. Hängt noch im 5er fest und ärgert sich darüber.' },
+      ],
+      meetings: 3,
+      baseAffinity: 72,
     },
     {
       id: 'c2',
@@ -100,6 +107,13 @@ export const seed: DB = {
       ],
       lastBump: 'vor 2 Tagen · Isar-Run',
       teach: 'Lauftechnik & Atmung',
+      answers: { h1: 2, h2: 1, h3: 0, h4: 0, h5: 1, h6: 1 },
+      interests: [
+        { name: 'Laufen', depth: 'Läuft seit einer schwierigen Zeit letztes Jahr. Morgens an der Isar, meistens allein, ohne Musik.' },
+        { name: 'Fotografie', depth: 'Analog, eine geerbte Kamera. Entwickelt selbst und zeigt fast nichts davon her.' },
+      ],
+      meetings: 2,
+      baseAffinity: 68,
     },
     {
       id: 'c3',
@@ -113,7 +127,14 @@ export const seed: DB = {
       reported: false,
       levels: humanLevels(),
       lastBump: 'gerade eben · Isarufer',
-      teach: 'Gitarre',
+      teach: 'Gitarre lernen',
+      answers: { h1: 0, h2: 0, h3: 1, h4: 0, h5: 1, h6: 1 },
+      interests: [
+        { name: 'Gitarre lernen', depth: 'Spielt seit sieben Jahren, hat als Kind angefangen, weil ihr Vater es konnte. Bringt es gerne bei, sagt aber, sie sei ungeduldig.' },
+        { name: 'Bouldern', depth: 'Zweimal die Woche in der Halle. Mag es, weil man dabei reden kann, ohne sich anschauen zu müssen.' },
+      ],
+      meetings: 0,
+      baseAffinity: 64,
     },
   ],
   activities: [
@@ -220,6 +241,13 @@ export const seed: DB = {
       skills: ['Shopify', 'Logistik', 'Ads'],
       levels: bizLevels(),
       trend: [70, 73, 77, 76, 80, 83],
+      answers: { b1: 0, b2: 0, b3: 0, b4: 0, b5: 0 },
+      interests: [
+        { name: 'Business aufziehen', depth: 'Hat mit 19 einen Shopify-Shop hochgezogen, nach elf Monaten dichtgemacht. Sagt, er hat dabei mehr gelernt als im ganzen Studium.' },
+      ],
+      teach: 'Shop-Setup & Supplier',
+      meetings: 1,
+      baseAffinity: 78,
     },
     {
       id: 'b2',
@@ -238,6 +266,13 @@ export const seed: DB = {
         { name: 'Exit-Vorstellung', v: null },
       ],
       trend: [66, 69, 72, 75, 74, 78],
+      answers: { b1: 0, b2: 1, b3: 1, b4: 1, b5: 1 },
+      interests: [
+        { name: 'Business aufziehen', depth: 'Macht Branding freiberuflich, will weg von Auftragsarbeit hin zu einem eigenen Produkt.' },
+      ],
+      teach: 'Branding & Mockups',
+      meetings: 0,
+      baseAffinity: 74,
     },
     {
       id: 'b3',
@@ -256,6 +291,13 @@ export const seed: DB = {
         { name: 'Exit-Vorstellung', v: null },
       ],
       trend: [62, 64, 63, 68, 70, 71],
+      answers: { b1: 1, b2: 2, b3: 0, b4: 0, b5: 1 },
+      interests: [
+        { name: 'Fußball', depth: 'War Jugendtrainer, investiert heute in Sport-Marken, weil er den Markt von innen kennt.' },
+      ],
+      teach: 'Finanzierung & Netzwerk',
+      meetings: 0,
+      baseAffinity: 66,
     },
   ],
   feed: [

@@ -4,6 +4,9 @@ import { Animated, Easing, Pressable, ScrollView, Text, View } from 'react-nativ
 import { bizQuestions, humanQuestions } from '../data/questions';
 import { useStore } from '../store';
 import { base, font, radius } from '../theme';
+import { FazitCard } from './FazitCard';
+import { InterestDepth } from './InterestDepth';
+import { ScoreBreakdown } from './ScoreBreakdown';
 import { useToast } from './Toast';
 import {
   Avatar,
@@ -38,7 +41,7 @@ export function MatchSheet({
   onStartQuestions: (target: SheetTarget) => void;
 }) {
   const t = useTheme();
-  const { db, blockPerson, reportPerson } = useStore();
+  const { db, blockPerson, reportPerson, scoreFor, recordMeeting } = useStore();
   const { say } = useToast();
   const slide = useRef(new Animated.Value(0)).current;
 
@@ -63,6 +66,8 @@ export function MatchSheet({
   const isBiz = target.kind === 'biz';
   const questions = isBiz ? bizQuestions : humanQuestions;
   const left = Math.max(0, questions.length - answeredCount);
+  const scored = scoreFor(target);
+  const depthUnlocked = person.score >= 70 || person.meetings >= 2;
 
   return (
     <>
@@ -181,6 +186,15 @@ export function MatchSheet({
             />
           </Card>
 
+          {scored ? <ScoreBreakdown parts={scored.parts} score={person.score} /> : null}
+
+          {scored && scored.answered > 0 ? (
+            <>
+              <SectionLabel>Fazit</SectionLabel>
+              <FazitCard fazit={scored.fazit} />
+            </>
+          ) : null}
+
           <SectionLabel>{isBiz ? 'Skill-Fit Matrix' : 'Eure Ebenen'}</SectionLabel>
           {person.levels.map((l) => (
             <Bar
@@ -191,6 +205,14 @@ export function MatchSheet({
               hint={l.v === null ? 'Schaltet frei nach 3 beantworteten Fragen' : undefined}
             />
           ))}
+
+          <SectionLabel>Was {person.name} antreibt</SectionLabel>
+          <InterestDepth
+            interests={person.interests}
+            unlocked={depthUnlocked}
+            requirement={`Schaltet frei ab Score 70 oder nach dem zweiten echten Treffen. Aktuell: ${person.score} · ${person.meetings} Treffen.`}
+            shared={db.profile.want}
+          />
 
           <SectionLabel>Score-Verlauf</SectionLabel>
           <Card style={{ marginTop: 8 }}>
@@ -203,7 +225,18 @@ export function MatchSheet({
               </View>
               <Sparkline points={person.trend} width={90} height={34} />
             </Row>
+            <GhostButton
+              title="Wir haben uns getroffen"
+              icon="repeat"
+              onPress={() => {
+                const gained = recordMeeting(target);
+                say(gained > 0 ? `Konstanz-Bonus: +${gained}` : 'Treffen gespeichert');
+              }}
+              style={{ marginTop: 14 }}
+            />
           </Card>
+
+          <SectionLabel>Vorschläge</SectionLabel>
 
           {isBiz ? (
             <>
